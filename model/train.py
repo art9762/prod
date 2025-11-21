@@ -6,13 +6,13 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 TRAIN_CSV_PATH = 'data.csv'
 
 # Имя колонки, которую нужно предсказывать (например, 'price', 'is_churn', 'species')
-TARGET_COLUMN = 'target' 
+TARGET_COLUMN = 'price' 
 
 # Папка, куда сохранится обученная модель
-MODEL_SAVE_PATH = 'autogluon_model'
+MODEL_SAVE_PATH = 'model'
 
 # Качество обучения. Опции: 'best_quality' (долго, но точно), 'high_quality', 'good_quality', 'medium_quality'
-PRESETS = 'medium_quality' 
+PRESETS = 'best_quality' 
 # -----------------
 
 def train_model():
