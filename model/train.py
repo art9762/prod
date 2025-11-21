@@ -3,7 +3,7 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 
 # --- НАСТРОЙКИ ---
 # Имя вашего файла с данными для обучения
-TRAIN_CSV_PATH = 'data.csv'
+TRAIN_CSV_PATH = 'cian_data.csv'
 
 # Имя колонки, которую нужно предсказывать (например, 'price', 'is_churn', 'species')
 TARGET_COLUMN = 'price' 
