@@ -9,7 +9,7 @@ TRAIN_CSV_PATH = 'data.csv'
 TARGET_COLUMN = 'price' 
 
 # Папка, куда сохранится обученная модель
-MODEL_SAVE_PATH = 'model'
+MODEL_SAVE_PATH = 'models/model'
 
 # Качество обучения. Опции: 'best_quality' (долго, но точно), 'high_quality', 'good_quality', 'medium_quality'
 PRESETS = 'best_quality' 
