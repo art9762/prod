@@ -1,9 +1,3 @@
-"""
-AutoGluon Training Module
-
-This module provides functionality to train AutoGluon models for tabular data.
-Supports both classification and regression tasks.
-"""
 
 import os
 import argparse
