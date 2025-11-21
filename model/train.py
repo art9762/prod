@@ -12,7 +12,7 @@ TARGET_COLUMN = 'sq_price_amt'
 MODEL_SAVE_PATH = 'models/model'
 
 # Качество обучения. Опции: 'best_quality' (долго, но точно), 'high_quality', 'good_quality', 'medium_quality'
-PRESETS = 'medium_quality' 
+PRESETS = 'best_quality' 
 # -----------------
 
 def train_model():
