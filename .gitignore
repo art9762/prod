@@ -1,0 +1,49 @@
+# Models directory
+models/
+
+# Model file extensions
+*.pkl
+*.pickle
+*.pth
+*.pt
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+*.ubj
+*.joblib
+*.model
+*.ckpt
+*.safetensors
+
+# AutoGluon specific
+*.pkl
+*.ubj
+
+# Model checkpoints and weights
+checkpoints/
+weights/
+*.weights
+
+# Temporary model files
+*.tmp
+*.temp
+
+# Cache directories
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
