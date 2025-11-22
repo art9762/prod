@@ -3,13 +3,13 @@ from autogluon.tabular import TabularDataset, TabularPredictor
 
 # --- НАСТРОЙКИ ---
 # Имя вашего файла с данными для обучения
-TRAIN_CSV_PATH = 'data.csv'
+TRAIN_CSV_PATH = '/Users/artem/Documents/GitHub/ai_training/datasets/cian_data_cleaned.csv'
 
 # Имя колонки, которую нужно предсказывать (например, 'price', 'is_churn', 'species')
-TARGET_COLUMN = 'price' 
+TARGET_COLUMN = 'sq_price_amt' 
 
 # Папка, куда сохранится обученная модель
-MODEL_SAVE_PATH = 'model'
+MODEL_SAVE_PATH = 'models/model'
 
 # Качество обучения. Опции: 'best_quality' (долго, но точно), 'high_quality', 'good_quality', 'medium_quality'
 PRESETS = 'best_quality' 
