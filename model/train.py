@@ -3,9 +3,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import os
 
-training_path = '/Users/artem/Documents/GitHub/ai_training/datasets/cian_data_cleaned.csv'
+training_path = '/Users/artem/Documents/GitHub/ai_training/datasets/realty_picks.csv'
 model_path = 'models/model'
-target_column = 'sq_price_amt'
+target_column = 'monthly_price_rub'
 presets = 'best_quality'
 
 # Load data
