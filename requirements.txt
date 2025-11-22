@@ -3,3 +3,5 @@ uvicorn == 0.34.0
 tensorflow
 autogluon
 pandas
+matplotlib
+scikit-learn

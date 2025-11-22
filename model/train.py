@@ -1,46 +1,54 @@
+from autogluon.tabular import TabularPredictor, TabularDataset
 import pandas as pd
-from autogluon.tabular import TabularDataset, TabularPredictor
+from sklearn.model_selection import train_test_split
+import os
 
-# --- НАСТРОЙКИ ---
-# Имя вашего файла с данными для обучения
-TRAIN_CSV_PATH = '/Users/artem/Documents/GitHub/ai_training/datasets/cian_data_cleaned.csv'
+training_path = '/Users/artem/Documents/GitHub/ai_training/datasets/cian_data_cleaned.csv'
+model_path = 'models/model'
+target_column = 'sq_price_amt'
+presets = 'best_quality'
 
-# Имя колонки, которую нужно предсказывать (например, 'price', 'is_churn', 'species')
-TARGET_COLUMN = 'sq_price_amt' 
+# Load data
+print("Loading data...")
+data = pd.read_csv(training_path)
 
-# Папка, куда сохранится обученная модель
-MODEL_SAVE_PATH = 'models/model'
+# Split data into train and test sets
+print("Splitting data into train and test sets...")
+train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
+print(f"Train set size: {len(train_data)}, Test set size: {len(test_data)}")
 
-# Качество обучения. Опции: 'best_quality' (долго, но точно), 'high_quality', 'good_quality', 'medium_quality'
-PRESETS = 'best_quality' 
-# -----------------
+# Train model
+print("Training model...")
+predictor = TabularPredictor(label=target_column, path=model_path).fit(
+    train_data=train_data,
+    time_limit=300,  
+    presets='best_quality'  #'medium_quality', 'high_quality', 'best_quality'
+)
 
-def train_model():
-    print("Загрузка данных...")
-    train_data = TabularDataset(TRAIN_CSV_PATH)
-    
-    print(f"Начинаем обучение. Целевая колонка: {TARGET_COLUMN}")
-    
-    # Инициализация предиктора
-    predictor = TabularPredictor(
-        label=TARGET_COLUMN, 
-        path=MODEL_SAVE_PATH,
-        problem_type=None,  # AutoGluon сам определит (регрессия или классификация)
-        eval_metric=None    # AutoGluon сам выберет метрику (accuracy, rmse и т.д.)
-    )
-    
-    # Запуск обучения
-    predictor.fit(
-        train_data, 
-        presets=PRESETS
-    )
+# Evaluate model on test set
+print("\n" + "="*50)
+print("Evaluating model on test set...")
+print("="*50)
+performance = predictor.evaluate(test_data, silent=False)
+print(f"\nEvaluation Results:")
+print(performance)
 
-    print("Обучение завершено.")
-    
-    # Вывод результатов лидерборда (сравнение моделей)
-    print("\nРезультаты моделей:")
-    leaderboard = predictor.leaderboard(train_data, silent=True)
-    print(leaderboard.head())
+# Get leaderboard to see individual model performance
+print("\n" + "="*50)
+print("Model Leaderboard:")
+print("="*50)
+leaderboard = predictor.leaderboard(test_data, silent=False)
+print(leaderboard)
 
-if __name__ == '__main__':
-    train_model()
+# Save evaluation results
+eval_results_path = os.path.join(model_path, 'evaluation_results.txt')
+os.makedirs(model_path, exist_ok=True)
+with open(eval_results_path, 'w') as f:
+    f.write("Evaluation Results:\n")
+    f.write(str(performance))
+    f.write("\n\nLeaderboard:\n")
+    f.write(str(leaderboard))
+
+print(f"\nEvaluation results saved to: {eval_results_path}")
+print("\nTraining and evaluation completed!")
+
