@@ -1,93 +1,273 @@
-# ai_training
+# AI Training - Real Estate Price Prediction
 
+A machine learning project for predicting real estate prices using AutoGluon's tabular prediction capabilities. This project includes model training, evaluation, and a REST API for making predictions.
 
+## Overview
 
-## Getting started
+This project uses AutoGluon to train and deploy a regression model that predicts real estate prices (`sq_price_amt`) based on various property features. The model is trained on cleaned real estate data and can be used via a FastAPI-based REST API or command-line interface.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Features
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- **Automated ML Training**: Uses AutoGluon's TabularPredictor for automated model selection and training
+- **Comprehensive Evaluation**: Detailed metrics and visualizations for model performance
+- **REST API**: FastAPI-based API for real-time predictions
+- **Batch Predictions**: Support for single and batch prediction requests
+- **Data Cleaning**: Scripts for preprocessing and cleaning real estate datasets
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.prodcontest.com/team-25/ai_training.git
-git branch -M master
-git push -uf origin master
+ai_training/
+├── model/
+│   ├── train.py          # Model training script
+│   ├── predict.py        # Prediction API and CLI tool
+│   └── evaluate.py       # Model evaluation script
+├── datasets/
+│   ├── cian_data.csv     # Raw real estate data
+│   ├── cian_data_cleaned.csv  # Cleaned dataset
+│   ├── dataset_clr.py    # Data cleaning script
+│   └── ...
+├── guides/               # Documentation and guides
+├── requirements.txt      # Python dependencies
+├── DOCKERFILE           # Docker configuration
+└── README.md            # This file
 ```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.prodcontest.com/team-25/ai_training/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+### Prerequisites
+
+- Python 3.8 or higher
+- pip package manager
+
+### Setup
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd ai_training
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### 1. Data Preparation
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Before training, ensure your data is cleaned and prepared. The project includes a data cleaning script:
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```bash
+python datasets/dataset_clr.py
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+This script filters out outliers and prepares the dataset for training.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 2. Model Training
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Train the model using the training script:
+
+```bash
+python model/train.py
+```
+
+**Configuration** (in `train.py`):
+- `training_path`: Path to cleaned training data
+- `model_path`: Directory where the model will be saved
+- `target_column`: Target variable to predict (default: `sq_price_amt`)
+- `presets`: Quality preset (`'medium_quality'`, `'high_quality'`, `'best_quality'`)
+- `time_limit`: Training time limit in seconds (default: 300)
+
+The script will:
+- Load and split the data (80% train, 20% test)
+- Train multiple models using AutoGluon
+- Evaluate on the test set
+- Save the model and evaluation results
+
+### 3. Model Evaluation
+
+Evaluate the trained model with comprehensive metrics and visualizations:
+
+```bash
+python model/evaluate.py
+```
+
+**Options**:
+```bash
+python model/evaluate.py \
+    --model_path models/model \
+    --test_data datasets/cian_data_cleaned.csv \
+    --target sq_price_amt \
+    --output_dir evaluation_results \
+    --no-plots  # Skip visualization plots
+```
+
+The evaluation script generates:
+- **Metrics**: RMSE, MAE, R², MAPE, and more
+- **Visualizations**: 
+  - Predictions vs Actual scatter plot
+  - Residual plots
+  - Error distribution plots
+- **Reports**: JSON and text files with detailed results
+- **Leaderboard**: Performance comparison of all trained models
+- **Feature Importance**: Top features contributing to predictions
+
+### 4. Making Predictions
+
+#### Option A: REST API (Recommended)
+
+Start the prediction API server:
+
+```bash
+python model/predict.py serve
+```
+
+The API will be available at `http://localhost:8000`
+
+**API Endpoints**:
+
+- `GET /` - API information
+- `GET /health` - Health check
+- `POST /predict` - Single or batch predictions
+
+**Example: Single Prediction**
+```bash
+curl -X POST "http://localhost:8000/predict" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "feature1": value1,
+       "feature2": value2,
+       ...
+     }'
+```
+
+**Example: Batch Prediction**
+```bash
+curl -X POST "http://localhost:8000/predict/batch" \
+     -H "Content-Type: application/json" \
+     -d '[
+       {"feature1": value1, "feature2": value2, ...},
+       {"feature1": value3, "feature2": value4, ...}
+     ]'
+```
+
+**Response Format**:
+```json
+{
+  "prediction": 12345.67
+}
+```
+
+or for batch:
+```json
+{
+  "predictions": [12345.67, 23456.78, ...],
+  "count": 2
+}
+```
+
+#### Option B: Command Line
+
+Make predictions from a CSV file:
+
+```bash
+python model/predict.py
+```
+
+**Configuration** (in `predict.py`):
+- `TEST_CSV_PATH`: Path to CSV file with features (without target column)
+- `MODEL_PATH`: Path to trained model
+- `OUTPUT_FILENAME`: Output file for predictions
+
+## Configuration
+
+### Model Training Settings
+
+Edit `model/train.py` to customize:
+- Training data path
+- Model save location
+- Target column name
+- Quality presets
+- Training time limit
+
+### API Settings
+
+Edit `model/predict.py` to customize:
+- Model path
+- Test data path
+- Output filename
+- API host and port (in `uvicorn.run()`)
+
+### Evaluation Settings
+
+Edit `model/evaluate.py` to customize:
+- Model path
+- Test data path
+- Target column
+- Output directory
+- Plot generation
+
+## Dependencies
+
+- **fastapi**: Web framework for the prediction API
+- **uvicorn**: ASGI server for FastAPI
+- **tensorflow**: Deep learning framework (used by AutoGluon)
+- **autogluon**: Automated machine learning library
+- **pandas**: Data manipulation and analysis
+- **matplotlib**: Plotting and visualization
+- **scikit-learn**: Machine learning utilities
+
+## Model Performance
+
+The model performance depends on:
+- Data quality and size
+- Feature engineering
+- Training time limit
+- Quality preset selected
+
+Check the evaluation results in `evaluation_results/` directory after running `evaluate.py` for detailed metrics.
+
+## Docker Support
+
+A Dockerfile is included for containerized deployment. Build and run:
+
+```bash
+docker build -t ai-training .
+docker run -p 8000:8000 ai-training
+```
+
+## Notes
+
+- The model uses AutoGluon's ensemble of multiple algorithms
+- Training time increases with `best_quality` preset
+- Ensure sufficient memory for large datasets
+- The API loads the model at startup, so first request may be slower
+
+## Troubleshooting
+
+**Model not found error**:
+- Ensure you've trained the model first using `train.py`
+- Check that `MODEL_PATH` in `predict.py` matches the path used in training
+
+**Memory issues**:
+- Reduce dataset size or use `medium_quality` preset
+- Increase system RAM or use a machine with more memory
+
+**API connection errors**:
+- Check that the API server is running
+- Verify the port (default: 8000) is not in use
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+[Add your license information here]
+
+## Contributing
+
+[Add contribution guidelines here]
+
+## Contact
+
+[Add contact information here]
+
