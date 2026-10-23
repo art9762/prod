@@ -1,273 +1,135 @@
-# AI Training - Real Estate Price Prediction
+<div align="center">
 
-A machine learning project for predicting real estate prices using AutoGluon's tabular prediction capabilities. This project includes model training, evaluation, and a REST API for making predictions.
+# AI Training · Prediction API
 
-## Overview
+**AutoGluon regression experiments with a FastAPI service and CSV prediction tool.**
 
-This project uses AutoGluon to train and deploy a regression model that predicts real estate prices (`sq_price_amt`) based on various property features. The model is trained on cleaned real estate data and can be used via a FastAPI-based REST API or command-line interface.
+[API reference](#prediction-api) · [Quick start](#quick-start) · [Tests](#tests) · [Remaining work](#remaining-work)
 
-## Features
+</div>
 
-- **Automated ML Training**: Uses AutoGluon's TabularPredictor for automated model selection and training
-- **Comprehensive Evaluation**: Detailed metrics and visualizations for model performance
-- **REST API**: FastAPI-based API for real-time predictions
-- **Batch Predictions**: Support for single and batch prediction requests
-- **Data Cleaning**: Scripts for preprocessing and cleaning real estate datasets
+> Experimental project. API and CSV contracts are tested with synthetic predictors.
+> Model accuracy, dataset quality and production deployment have not been validated by these tests.
 
-## Project Structure
+## What works
 
-```
-ai_training/
-├── model/
-│   ├── train.py          # Model training script
-│   ├── predict.py        # Prediction API and CLI tool
-│   └── evaluate.py       # Model evaluation script
-├── datasets/
-│   ├── cian_data.csv     # Raw real estate data
-│   ├── cian_data_cleaned.csv  # Cleaned dataset
-│   ├── dataset_clr.py    # Data cleaning script
-│   └── ...
-├── guides/               # Documentation and guides
-├── requirements.txt      # Python dependencies
-├── DOCKERFILE           # Docker configuration
-└── README.md            # This file
-```
+| Workflow | Behavior |
+| --- | --- |
+| Single prediction | A feature object returns one numeric `prediction` |
+| Batch prediction | Both batch forms return `predictions` and `count`, even for one row |
+| Readiness | `/health` returns 503 until a saved model has loaded; `/docs` remains available |
+| Model location | `models/model` by default, resolved from the repository root |
+| CSV prediction | Explicit input/output arguments; atomic output; source aliases rejected |
+| Contract tests | No AutoGluon, TensorFlow, saved models or repository datasets required |
 
-## Installation
-
-### Prerequisites
-
-- Python 3.8 or higher
-- pip package manager
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd ai_training
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-### 1. Data Preparation
-
-Before training, ensure your data is cleaned and prepared. The project includes a data cleaning script:
+## Quick start
 
 ```bash
-python datasets/dataset_clr.py
+git clone https://github.com/art9762/prod.git
+cd prod
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python model/predict.py serve --model-path models/model --port 8000
 ```
 
-This script filters out outliers and prepares the dataset for training.
+Supply a trusted AutoGluon predictor under `models/model`, or select its directory
+with `--model-path` or the `MODEL_PATH` environment variable. Relative model paths
+are resolved from the repository root, including when launched from another
+working directory. Importing `model.predict` or requesting `--help` does not load
+AutoGluon or read a model.
 
-### 2. Model Training
+The service exposes [interactive API documentation](http://localhost:8000/docs).
+If the model or inference runtime is unavailable, the service starts with
+prediction/readiness endpoints returning 503. Fix the installation/path and
+restart it. The API does not train or download a model automatically.
 
-Train the model using the training script:
+For the API shell and tests without the ML runtime, install
+`requirements-api.txt` or `requirements-dev.txt` instead of the full ML requirements.
 
-```bash
-python model/train.py
-```
+## Prediction API
 
-**Configuration** (in `train.py`):
-- `training_path`: Path to cleaned training data
-- `model_path`: Directory where the model will be saved
-- `target_column`: Target variable to predict (default: `sq_price_amt`)
-- `presets`: Quality preset (`'medium_quality'`, `'high_quality'`, `'best_quality'`)
-- `time_limit`: Training time limit in seconds (default: 300)
+The feature names and types must match the loaded model. `total_area` below is
+an example, not a declaration of the trained feature schema.
 
-The script will:
-- Load and split the data (80% train, 20% test)
-- Train multiple models using AutoGluon
-- Evaluate on the test set
-- Save the model and evaluation results
+**Single record — `POST /predict`:**
 
-### 3. Model Evaluation
-
-Evaluate the trained model with comprehensive metrics and visualizations:
-
-```bash
-python model/evaluate.py
-```
-
-**Options**:
-```bash
-python model/evaluate.py \
-    --model_path models/model \
-    --test_data datasets/cian_data_cleaned.csv \
-    --target sq_price_amt \
-    --output_dir evaluation_results \
-    --no-plots  # Skip visualization plots
-```
-
-The evaluation script generates:
-- **Metrics**: RMSE, MAE, R², MAPE, and more
-- **Visualizations**: 
-  - Predictions vs Actual scatter plot
-  - Residual plots
-  - Error distribution plots
-- **Reports**: JSON and text files with detailed results
-- **Leaderboard**: Performance comparison of all trained models
-- **Feature Importance**: Top features contributing to predictions
-
-### 4. Making Predictions
-
-#### Option A: REST API (Recommended)
-
-Start the prediction API server:
-
-```bash
-python model/predict.py serve
-```
-
-The API will be available at `http://localhost:8000`
-
-**API Endpoints**:
-
-- `GET /` - API information
-- `GET /health` - Health check
-- `POST /predict` - Single or batch predictions
-
-**Example: Single Prediction**
-```bash
-curl -X POST "http://localhost:8000/predict" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "feature1": value1,
-       "feature2": value2,
-       ...
-     }'
-```
-
-**Example: Batch Prediction**
-```bash
-curl -X POST "http://localhost:8000/predict/batch" \
-     -H "Content-Type: application/json" \
-     -d '[
-       {"feature1": value1, "feature2": value2, ...},
-       {"feature1": value3, "feature2": value4, ...}
-     ]'
-```
-
-**Response Format**:
 ```json
-{
-  "prediction": 12345.67
-}
+{"total_area": 60.0}
 ```
 
-or for batch:
 ```json
-{
-  "predictions": [12345.67, 23456.78, ...],
-  "count": 2
-}
+{"prediction": 12345.67}
 ```
 
-#### Option B: Command Line
+**Batch — `POST /predict`:**
 
-Make predictions from a CSV file:
+```json
+{"records": [{"total_area": 60.0}, {"total_area": 80.0}]}
+```
+
+**Alternatively — `POST /predict/batch`:**
+
+```json
+[{"total_area": 60.0}, {"total_area": 80.0}]
+```
+
+Both batch forms return the same envelope:
+
+```json
+{"predictions": [12345.67, 23456.78], "count": 2}
+```
+
+Requests accept 1–1000 non-empty feature objects. Batch output preserves input
+order and includes `count` for a single-row batch. Invalid inputs return 400/422,
+an unavailable predictor returns 503, and malformed/non-finite model output
+returns an explicit failure. No partial batch result is returned.
+
+Inference runs in a worker thread and calls to the shared predictor are
+serialized. This does not establish throughput or a production capacity limit.
+
+## CSV prediction
 
 ```bash
-python model/predict.py
+python model/predict.py predict --model-path models/model \
+  --input test_data.csv --output predictions.csv
+python model/predict.py --help
 ```
 
-**Configuration** (in `predict.py`):
-- `TEST_CSV_PATH`: Path to CSV file with features (without target column)
-- `MODEL_PATH`: Path to trained model
-- `OUTPUT_FILENAME`: Output file for predictions
+The original no-argument command still selects `test_data.csv` and
+`predictions.csv`. A successful command replaces output atomically; failed
+inference preserves existing output. Output cannot be the input file, a symlink
+to it or a hard link to it.
 
-## Configuration
+## Training and evaluation
 
-### Model Training Settings
+`model/train.py` and `model/evaluate.py` are the existing experiment scripts.
+Configure an appropriate dataset, target and model output before running them.
+The training script currently contains a developer-specific data path and runs
+at module scope; it is not a reusable library entry point. The current training
+configuration writes `models/model` and uses `monthly_price_rub` as its target.
+A loaded model's own feature/label metadata remains authoritative.
 
-Edit `model/train.py` to customize:
-- Training data path
-- Model save location
-- Target column name
-- Quality presets
-- Training time limit
+No repository dataset or saved model is used by the API contract test suite.
 
-### API Settings
-
-Edit `model/predict.py` to customize:
-- Model path
-- Test data path
-- Output filename
-- API host and port (in `uvicorn.run()`)
-
-### Evaluation Settings
-
-Edit `model/evaluate.py` to customize:
-- Model path
-- Test data path
-- Target column
-- Output directory
-- Plot generation
-
-## Dependencies
-
-- **fastapi**: Web framework for the prediction API
-- **uvicorn**: ASGI server for FastAPI
-- **tensorflow**: Deep learning framework (used by AutoGluon)
-- **autogluon**: Automated machine learning library
-- **pandas**: Data manipulation and analysis
-- **matplotlib**: Plotting and visualization
-- **scikit-learn**: Machine learning utilities
-
-## Model Performance
-
-The model performance depends on:
-- Data quality and size
-- Feature engineering
-- Training time limit
-- Quality preset selected
-
-Check the evaluation results in `evaluation_results/` directory after running `evaluate.py` for detailed metrics.
-
-## Docker Support
-
-A Dockerfile is included for containerized deployment. Build and run:
+## Tests
 
 ```bash
-docker build -t ai-training .
-docker run -p 8000:8000 ai-training
+python -m pip install -r requirements-dev.txt
+python -m pytest -q tests
+python -m compileall -q model/predict.py tests
 ```
 
-## Notes
+The GitHub workflow checks out only prediction source, tests and dependency
+lists. Tests cover readiness failures, both batch forms, invalid requests/model
+outputs, model path resolution and atomic CSV output without altering inputs.
 
-- The model uses AutoGluon's ensemble of multiple algorithms
-- Training time increases with `best_quality` preset
-- Ensure sufficient memory for large datasets
-- The API loads the model at startup, so first request may be slower
+## Remaining work
 
-## Troubleshooting
+- Replace experiment-specific training/evaluation paths with explicit CLI configuration.
+- Validate a real trained predictor and its feature/target contract on a held-out dataset.
+- Choose reproducible AutoGluon/ML dependency versions for the deployment platform.
+- Implement and verify a container deployment; the existing `DOCKERFILE` is empty.
+- Add deployment authentication, operational limits and inference performance measurements.
 
-**Model not found error**:
-- Ensure you've trained the model first using `train.py`
-- Check that `MODEL_PATH` in `predict.py` matches the path used in training
-
-**Memory issues**:
-- Reduce dataset size or use `medium_quality` preset
-- Increase system RAM or use a machine with more memory
-
-**API connection errors**:
-- Check that the API server is running
-- Verify the port (default: 8000) is not in use
-
-## License
-
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
-
-## Contact
-
-[Add contact information here]
-
+No project license has been selected in this repository.

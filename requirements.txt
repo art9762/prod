@@ -1,7 +1,5 @@
-fastapi == 0.115.6
-uvicorn == 0.34.0
+-r requirements-api.txt
 tensorflow
 autogluon
-pandas
 matplotlib
 scikit-learn
