@@ -1,172 +1,174 @@
-import pandas as pd
-from autogluon.tabular import TabularDataset, TabularPredictor
+"""Prediction API and CSV CLI; importing this module never loads a saved model."""
+
+import argparse
+from contextlib import asynccontextmanager
+import logging
+import math
+import os
+from pathlib import Path
+import tempfile
+import threading
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-import uvicorn
+import pandas as pd
 
-# --- НАСТРОЙКИ ---
-# Имя файла с новыми данными (без целевой колонки или с ней для проверки)
-TEST_CSV_PATH = 'test_data.csv'
-
-# Папка, где лежит модель (должна совпадать с MODEL_SAVE_PATH из train.py)
-MODEL_PATH = 'autogluon_model'
-
-# Имя файла, куда сохранятся результаты
-OUTPUT_FILENAME = 'predictions.csv'
-# -----------------
-
-# FastAPI app
-app = FastAPI(title="Prediction API", description="API for making predictions with AutoGluon model")
-
-# Global predictor variable
-predictor: Optional[TabularPredictor] = None
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+MODEL_PATH = os.getenv("MODEL_PATH", "models/model")
+TEST_CSV_PATH = "test_data.csv"
+OUTPUT_FILENAME = "predictions.csv"
+MAX_BATCH_RECORDS = 1000
+logger = logging.getLogger(__name__)
 
 
-def load_model():
-    """Load the model at startup"""
-    global predictor
-    print(f"Загрузка модели из {MODEL_PATH}...")
+def resolve_model_path(path):
+    path = Path(path).expanduser()
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def load_model(path=MODEL_PATH):
+    # AutoGluon is needed for inference, not for API discovery or --help.
+    from autogluon.tabular import TabularPredictor
+
+    return TabularPredictor.load(str(resolve_model_path(path)))
+
+
+def _records(value):
+    if not isinstance(value, list) or not value or len(value) > MAX_BATCH_RECORDS:
+        raise HTTPException(400, f"Provide between 1 and {MAX_BATCH_RECORDS} records")
+    if any(not isinstance(row, dict) or not row for row in value):
+        raise HTTPException(400, "Each record must be a non-empty feature object")
+    return value
+
+
+def _numbers(predictor, records):
+    values = predictor.predict(pd.DataFrame.from_records(records))
     try:
-        predictor = TabularPredictor.load(MODEL_PATH)
-        print("Модель успешно загружена!")
-        return predictor
-    except FileNotFoundError:
-        print(f"Ошибка: Модель не найдена в {MODEL_PATH}. Сначала запустите train.py!")
-        raise
+        values = values.tolist() if hasattr(values, "tolist") else list(values)
+        if len(values) != len(records):
+            raise RuntimeError("Prediction count differs from input count")
+        result = []
+        for value in values:
+            if pd.api.types.is_bool(value):
+                raise RuntimeError("The regression model returned a boolean")
+            number = float(value)
+            if not math.isfinite(number):
+                raise RuntimeError("The model returned a non-finite prediction")
+            result.append(number)
+    except (TypeError, ValueError, OverflowError):
+        raise RuntimeError("The regression model returned invalid numeric output") from None
+    return result
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Load model when the API starts"""
-    load_model()
+def create_app(*, model_path=MODEL_PATH, predictor_loader=None):
+    loader = predictor_loader or load_model
 
+    @asynccontextmanager
+    async def lifespan(application):
+        try:
+            application.state.predictor = loader(model_path)
+        except Exception as error:
+            application.state.predictor = None
+            logger.error("Model unavailable at startup (%s)", type(error).__name__)
+        yield
+        application.state.predictor = None
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {"message": "Prediction API is running", "model_path": MODEL_PATH}
+    application = FastAPI(title="Prediction API", lifespan=lifespan)
+    application.state.predictor = None
+    application.state.prediction_lock = threading.Lock()
 
+    def run(records):
+        predictor = application.state.predictor
+        if predictor is None:
+            raise HTTPException(503, "Model not loaded. Check MODEL_PATH and train the model first.")
+        records = _records(records)
+        try:
+            # Sync routes run in FastAPI's worker pool; one model is not invoked
+            # concurrently and expensive inference does not block the event loop.
+            with application.state.prediction_lock:
+                return _numbers(predictor, records)
+        except (KeyError, ValueError, TypeError):
+            raise HTTPException(400, "Features do not match the loaded regression model") from None
+        except Exception as error:
+            logger.error("Prediction failed (%s)", type(error).__name__)
+            raise HTTPException(500, "The model could not produce valid predictions") from None
 
-@app.get("/health")
-async def health():
-    """Health check endpoint"""
-    if predictor is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    return {"status": "healthy", "model_loaded": True}
+    @application.get("/")
+    def root():
+        return {"message": "Prediction API is running", "model_path": str(model_path)}
 
+    @application.get("/health")
+    def health():
+        if application.state.predictor is None:
+            raise HTTPException(503, "Model not loaded")
+        return {"status": "healthy", "model_loaded": True}
 
-@app.post("/predict")
-async def predict(data: Dict[str, Any]):
-    """
-    Make predictions on a single record or batch of records.
-    
-    Accepts JSON in the following formats:
-    - Single record: {"feature1": value1, "feature2": value2, ...}
-    - Batch: {"records": [{"feature1": value1, ...}, {"feature1": value2, ...}]}
-    """
-    if predictor is None:
-        raise HTTPException(status_code=503, detail="Model not loaded. Please ensure the model exists.")
-    
-    try:
-        # Check if it's a batch request
+    @application.post("/predict")
+    def predict(data: dict[str, Any]):
         if "records" in data:
-            records = data["records"]
-            if not isinstance(records, list) or len(records) == 0:
-                raise HTTPException(status_code=400, detail="'records' must be a non-empty list")
-            df = pd.DataFrame(records)
-        else:
-            # Single record
-            df = pd.DataFrame([data])
-        
-        # Make predictions
-        predictions = predictor.predict(df)
-        
-        # Convert predictions to list (handle both single and multiple predictions)
-        if len(predictions) == 1:
-            result = {"prediction": float(predictions.iloc[0]) if hasattr(predictions.iloc[0], '__float__') else predictions.iloc[0]}
-        else:
-            result = {"predictions": predictions.tolist()}
-        
-        return JSONResponse(content=result)
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error making prediction: {str(e)}")
+            values = run(data["records"])
+            return {"predictions": values, "count": len(values)}
+        return {"prediction": run([data])[0]}
+
+    @application.post("/predict/batch")
+    def predict_batch(data: list[dict[str, Any]]):
+        values = run(data)
+        return {"predictions": values, "count": len(values)}
+
+    return application
 
 
-@app.post("/predict/batch")
-async def predict_batch(data: List[Dict[str, Any]]):
-    """
-    Make predictions on a batch of records.
-    
-    Accepts JSON array of records:
-    [{"feature1": value1, "feature2": value2, ...}, ...]
-    """
-    if predictor is None:
-        raise HTTPException(status_code=503, detail="Model not loaded. Please ensure the model exists.")
-    
-    if not isinstance(data, list) or len(data) == 0:
-        raise HTTPException(status_code=400, detail="Request body must be a non-empty list of records")
-    
+app = create_app()
+
+
+def make_predictions(input_path=TEST_CSV_PATH, output_path=OUTPUT_FILENAME,
+                     model_path=MODEL_PATH, *, predictor_loader=None):
+    destination = Path(output_path)
+    if destination.resolve() == Path(input_path).resolve() or (
+        destination.exists() and os.path.samefile(input_path, destination)
+    ):
+        raise ValueError("Output must be different from the input CSV")
+    predictor = (predictor_loader or load_model)(model_path)
+    frame = pd.read_csv(input_path)
+    if frame.empty:
+        raise ValueError("Input CSV contains no records")
+    values = _numbers(predictor, frame.to_dict(orient="records"))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
     try:
-        df = pd.DataFrame(data)
-        predictions = predictor.predict(df)
-        
-        result = {
-            "predictions": predictions.tolist(),
-            "count": len(predictions)
-        }
-        
-        return JSONResponse(content=result)
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error making predictions: {str(e)}")
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="",
+                                         dir=destination.parent, prefix=".prediction-",
+                                         suffix=".tmp", delete=False) as file:
+            temporary = Path(file.name)
+            pd.DataFrame({"prediction": values}).to_csv(file, index=False)
+        os.replace(temporary, destination)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return destination
 
 
-def make_predictions():
-    """Original function for command-line predictions from CSV file"""
-    print(f"Загрузка модели из {MODEL_PATH}...")
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", nargs="?", choices=["predict", "serve"], default="predict")
+    parser.add_argument("--model-path", default=MODEL_PATH)
+    parser.add_argument("--input", default=TEST_CSV_PATH)
+    parser.add_argument("--output", default=OUTPUT_FILENAME)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args(argv)
+    if args.command == "serve":
+        import uvicorn
+
+        uvicorn.run(create_app(model_path=args.model_path), host=args.host, port=args.port)
+        return 0
     try:
-        predictor = TabularPredictor.load(MODEL_PATH)
-    except FileNotFoundError:
-        print("Ошибка: Модель не найдена. Сначала запустите train.py!")
-        return
-
-    print(f"Загрузка данных для предсказания из {TEST_CSV_PATH}...")
-    test_data = TabularDataset(TEST_CSV_PATH)
-
-    # Если в тестовых данных есть колонка с ответами, можно оценить точность
-    # if predictor.label in test_data.columns:
-    #     print("Оценка точность на тестовых данных:")
-    #     performance = predictor.evaluate(test_data)
-    #     print(performance)
-
-    print("Генерация предсказаний...")
-    # Получаем предсказания
-    predictions = predictor.predict(test_data)
-    
-    # Если нужна вероятность классов (для классификации), раскомментируйте строку ниже:
-    # prediction_proba = predictor.predict_proba(test_data)
-
-    # Сохранение результатов
-    # Мы объединяем исходные данные (или только ID) с предсказаниями для удобства
-    output_df = pd.DataFrame({'prediction': predictions})
-    
-    # Если хотите сохранить вместе с исходными данными:
-    # output_df = pd.concat([test_data, output_df], axis=1)
-
-    output_df.to_csv(OUTPUT_FILENAME, index=False)
-    print(f"Предсказания сохранены в файл: {OUTPUT_FILENAME}")
+        output = make_predictions(args.input, args.output, args.model_path)
+    except Exception as error:
+        parser.exit(1, f"Prediction failed: {error}\n")
+    print(f"Predictions saved to {output}")
+    return 0
 
 
-if __name__ == '__main__':
-    import sys
-    
-    # Check if running as API server or CLI tool
-    if len(sys.argv) > 1 and sys.argv[1] == 'serve':
-        # Run as API server
-        uvicorn.run(app, host="0.0.0.0", port=8000)
-    else:
-        # Run original CLI function
-        make_predictions()
+if __name__ == "__main__":
+    raise SystemExit(main())
